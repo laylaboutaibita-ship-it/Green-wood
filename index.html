@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Green Wood</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #f3eee1; }
+  #root { min-height: 100vh; }
+  @media print {
+    body * { visibility: hidden; }
+    #qr-print-area, #qr-print-area * { visibility: visible; }
+    #qr-print-area { position: absolute; inset: 0; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ---------- Firebase ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyAVl2mFBWaAc1uiGAc9nrruCmWqyjkx9u4",
+  authDomain: "green-wood-65625.firebaseapp.com",
+  projectId: "green-wood-65625",
+  storageBucket: "green-wood-65625.firebasestorage.app",
+  messagingSenderId: "1096716976732",
+  appId: "1:1096716976732:web:998639d65b8da5b8bc9c99",
+  measurementId: "G-GKMXR4CYG3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ---------- simple icon components (emoji-based, no external icon library needed) ----------
+const Ico = ({ children, size = 16 }) => (
+  <span style={{ fontSize: size, lineHeight: 1, display: "inline-block" }}>{children}</span>
+);
+const Coffee = (p) => <Ico {...p}>☕</Ico>;
+const Droplet = (p) => <Ico {...p}>💧</Ico>;
+const Cigarette = (p) => <Ico {...p}>🚬</Ico>;
+const GlassWater = (p) => <Ico {...p}>🥤</Ico>;
+const Plus = (p) => <Ico {...p}>➕</Ico>;
+const Minus = (p) => <Ico {...p}>➖</Ico>;
+const Trash2 = (p) => <Ico {...p}>🗑️</Ico>;
+const XIcon = (p) => <Ico {...p}>✕</Ico>;
+const Clock = (p) => <Ico {...p}>🕐</Ico>;
+const Receipt = (p) => <Ico {...p}>🧾</Ico>;
+const HistoryIcon = (p) => <Ico {...p}>📋</Ico>;
+const DoorOpen = (p) => <Ico {...p}>🚪</Ico>;
+const Users = (p) => <Ico {...p}>👥</Ico>;
+const Undo2 = (p) => <Ico {...p}>↩️</Ico>;
+const Settings = (p) => <Ico {...p}>⚙️</Ico>;
+const Bell = (p) => <Ico {...p}>🔔</Ico>;
+const QrIcon = (p) => <Ico {...p}>▦</Ico>;
+const Check = (p) => <Ico {...p}>✔️</Ico>;
+
+// ---------- Café floor plan ----------
+const SECTIONS = [
+  { id: "hall-right", title: "الصالة الرئيسية (يمين)", count: 11, prefix: "طاولة" },
+  { id: "hall-left", title: "الصالة الرئيسية (يسار)", count: 4, prefix: "طاولة" },
+  { id: "terrace-right", title: "التراس (يمين)", count: 5, prefix: "طاولة" },
+  { id: "terrace-left", title: "التراس (يسار)", count: 3, prefix: "طاولة" },
+  { id: "vip-salon", title: "صالونات VIP (الطابق العلوي)", count: 3, prefix: "صالون" },
+  { id: "vip-front", title: "VIP أمامي (الطابق العلوي)", count: 2, prefix: "طاولة" },
+  { id: "vip-back", title: "VIP خلفي (الطابق العلوي)", count: 5, prefix: "طاولة" },
+];
+
+const CATEGORY_ICON = {
+  "قهوة": Coffee,
+  "عصائر": GlassWater,
+  "مياه": Droplet,
+  "سجائر": Cigarette,
+};
+
+const DEFAULT_MENU = {
+  "قهوة": [
+    { name: "قهوة طاليان", price: 10, vipExtra: 2 },
+    { name: "قهوة نورمال", price: 10, vipExtra: 2 },
+    { name: "إسبريسو", price: 10, vipExtra: 2 },
+    { name: "نص نص", price: 11, vipExtra: 2 },
+    { name: "سيبباري", price: 13, vipExtra: 2 },
+    { name: "ليجي", price: 10, vipExtra: 2 },
+    { name: "دويل إسبريسو", price: 14, vipExtra: 2 },
+    { name: "الونجي أمريكان", price: 14, vipExtra: 2 },
+    { name: "أمريكانو", price: 11, vipExtra: 2 },
+    { name: "كافي كريم", price: 11, vipExtra: 2 },
+    { name: "كابتشينو", price: 14, vipExtra: 2 },
+    { name: "حليب شوكولاطة", price: 12, vipExtra: 2 },
+    { name: "حليب لويزا", price: 14, vipExtra: 2 },
+    { name: "حليب ليبتون", price: 11, vipExtra: 2 },
+  ],
+  "شاي": [
+    { name: "شاي مغربي", price: 11, vipExtra: 2 },
+    { name: "شاي بالأعشاب", price: 11, vipExtra: 2 },
+    { name: "لويزا", price: 11, vipExtra: 2 },
+  ],
+  "عصائر": [
+    { name: "عصير ليمون", price: 14, vipExtra: 2 },
+    { name: "عصير حامض", price: 12, vipExtra: 2 },
+    { name: "عصير تفاح", price: 14, vipExtra: 2 },
+    { name: "عصير موز", price: 14, vipExtra: 2 },
+    { name: "أفوكادو", price: 20, vipExtra: 2 },
+    { name: "أفوكادو بمكسرات", price: 28, vipExtra: 2 },
+  ],
+  "مشروبات غازية": [
+    { name: "كوكاكولا", price: 12, vipExtra: 2 },
+    { name: "هواي", price: 12, vipExtra: 2 },
+    { name: "شويبس حامض", price: 12, vipExtra: 2 },
+    { name: "بومس تفاح", price: 12, vipExtra: 2 },
+    { name: "سبرايت", price: 12, vipExtra: 2 },
+    { name: "فانتا", price: 12, vipExtra: 2 },
+    { name: "تروبيكانا أورانج", price: 14, vipExtra: 2 },
+    { name: "تروبيكانا", price: 10, vipExtra: 2 },
+  ],
+  "قهوة باردة": [
+    { name: "آيس لاتيه", price: 22, vipExtra: 2 },
+    { name: "آيس كابتشينو", price: 22, vipExtra: 2 },
+    { name: "آيس أمريكانو", price: 20, vipExtra: 2 },
+    { name: "آيس موكا", price: 25, vipExtra: 2 },
+  ],
+  "موخيطو وطاقة": [
+    { name: "موخيطو مكسيكو", price: 26, vipExtra: 2 },
+    { name: "كارامل إنرجي", price: 26, vipExtra: 2 },
+    { name: "بندق نعناع", price: 26, vipExtra: 2 },
+    { name: "رومان فانيلا", price: 26, vipExtra: 2 },
+    { name: "بيلو دريم", price: 28, vipExtra: 2 },
+  ],
+  "مياه": [
+    { name: "ماء معدني صغير", price: 3, vipExtra: 2 },
+    { name: "ماء معدني متوسط", price: 8, vipExtra: 2 },
+  ],
+  "الفطور": [
+    { name: "كرواصون", price: 6, vipExtra: 2 },
+    { name: "فطور بلدي", price: 20, vipExtra: 2 },
+    { name: "بان جريبي", price: 20, vipExtra: 2 },
+    { name: "فطور خليع", price: 35, vipExtra: 2 },
+    { name: "فطور بتبان", price: 20, vipExtra: 2 },
+    { name: "فطور أومليت", price: 24, vipExtra: 2 },
+  ],
+  "سجائر": [{ name: "سجائر", price: 2.5, vipExtra: 0 }],
+};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+function emptyTable() {
+  return { status: "empty", items: [], openedAt: null, guests: null };
+}
+
+function buildDefaultTables() {
+  const t = {};
+  SECTIONS.forEach((s) => {
+    for (let i = 1; i <= s.count; i++) {
+      t[`${s.id}-${i}`] = emptyTable();
+    }
+  });
+  return t;
+}
+
+function allTableIds() {
+  const ids = [];
+  SECTIONS.forEach((s) => {
+    for (let i = 1; i <= s.count; i++) ids.push(`${s.id}-${i}`);
+  });
+  return ids;
+}
+
+function sectionOf(tableId) {
+  return SECTIONS.find((s) => tableId.startsWith(s.id + "-"));
+}
+function labelOf(tableId) {
+  const s = sectionOf(tableId);
+  if (!s) return tableId;
+  const n = tableId.slice(s.id.length + 1);
+  return `${s.prefix} ${n}`;
+}
+function isVipTable(tableId) {
+  return Boolean(sectionOf(tableId)?.id.startsWith("vip"));
+}
+
+// simple beep using Web Audio API (no external sound file needed)
+function playBeep(ctxRef) {
+  try {
+    if (!ctxRef.current) {
+      ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = ctxRef.current;
+    if (ctx.state === "suspended") ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  } catch (e) {}
+}
+
+// =====================================================================
+// CUSTOMER ORDER PAGE (opened via QR code: index.html?table=hall-right-3)
+// =====================================================================
+function CustomerOrderApp({ tableId }) {
+  const [cart, setCart] = useState([]);
+  const [note, setNote] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const valid = allTableIds().includes(tableId);
+  const vip = isVipTable(tableId);
+
+  function addToCart(name, price, vipExtra) {
+    setCart((prev) => {
+      const idx = prev.findIndex((it) => it.name === name && it.price === price);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
+        return copy;
+      }
+      return [...prev, { id: uid(), name, price, qty: 1, vipExtra: vipExtra || 0 }];
+    });
+  }
+  function changeQty(id, delta) {
+    setCart((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, qty: it.qty + delta } : it)).filter((it) => it.qty > 0)
+    );
+  }
+
+  const total = cart.reduce((s, it) => s + it.price * it.qty, 0);
+
+  async function submitOrder() {
+    if (cart.length === 0) return;
+    setSending(true);
+    setError("");
+    try {
+      await db.collection("orders").add({
+        tableId,
+        tableLabel: labelOf(tableId),
+        sectionTitle: sectionOf(tableId)?.title || "",
+        items: cart.map((it) => ({ name: it.name, price: it.price, qty: it.qty, vipExtra: it.vipExtra || 0 })),
+        note: note.trim(),
+        status: "pending",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setSubmitted(true);
+      setCart([]);
+      setNote("");
+    } catch (e) {
+      setError("تعذر إرسال الطلب، تحقق من الاتصال بالإنترنت وحاول مرة أخرى.");
+    }
+    setSending(false);
+  }
+
+  if (!valid) {
+    return (
+      <div dir="rtl" className="gw-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 40 }}>⚠️</div>
+          <h2>رمز QR غير صالح</h2>
+          <p>يرجى مسح رمز الطاولة من جديد.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div dir="rtl" className="gw-root co-root">
+      <CustomerStyles />
+      <header className="gw-header">
+        <h1 className="gw-title">Green Wood</h1>
+        <div className="gw-sub">أهلاً بك، أنت الآن على {labelOf(tableId)}</div>
+        {vip && <div className="gw-vip-note" style={{ marginTop: 10 }}>طاولة VIP — الأسعار المعروضة نهائية</div>}
+      </header>
+
+      {submitted ? (
+        <div className="co-confirm">
+          <div style={{ fontSize: 50 }}>✅</div>
+          <h2>تم إرسال طلبك!</h2>
+          <p>سيصل النادل إليك قريباً.</p>
+          <button className="gw-checkout step1" onClick={() => setSubmitted(false)}>
+            <Plus size={16} /> إضافة طلب آخر
+          </button>
+        </div>
+      ) : (
+        <>
+          {Object.entries(DEFAULT_MENU).map(([cat, items]) => {
+            const Icon = CATEGORY_ICON[cat];
+            return (
+              <div key={cat} className="gw-cat">
+                <h4>{Icon ? <Icon size={13} /> : null} {cat}</h4>
+                <div className="gw-quick">
+                  {items.map((it, idx) => {
+                    const extra = vip ? it.vipExtra || 0 : 0;
+                    const p = it.price + extra;
+                    return (
+                      <button key={cat + idx} onClick={() => addToCart(it.name, p, extra)}>
+                        {it.name} · {p} د.م
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="co-cart-area">
+            <h4 style={{ color: "var(--wood)" }}>سلتك</h4>
+            {cart.length === 0 && <div className="gw-no-items">لم تختر أي صنف بعد</div>}
+            {cart.map((it) => (
+              <div className="gw-item" key={it.id}>
+                <div className="iname">{it.name}</div>
+                <div className="iprice">{it.price} د.م</div>
+                <div className="gw-qty">
+                  <button onClick={() => changeQty(it.id, -1)}><Minus size={13} /></button>
+                  <span>{it.qty}</span>
+                  <button onClick={() => changeQty(it.id, 1)}><Plus size={13} /></button>
+                </div>
+              </div>
+            ))}
+            <textarea
+              className="co-note"
+              placeholder="ملاحظة (مثال: سكرة واحدة، بدون حليب)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+
+      {!submitted && cart.length > 0 && (
+        <div className="co-bar">
+          <div className="co-bar-total">{total.toFixed(2)} د.م</div>
+          <button disabled={sending} className="gw-checkout step1" onClick={submitOrder}>
+            <Receipt size={16} /> {sending ? "جارٍ الإرسال..." : "إرسال الطلب"}
+          </button>
+        </div>
+      )}
+      {error && <div className="co-error">{error}</div>}
+    </div>
+  );
+}
+
+function CustomerStyles() {
+  return (
+    <style>{`
+      .co-root { padding-bottom: 110px; }
+      .co-cart-area { background: var(--card); border-radius: 14px; padding: 14px; margin-top: 10px; }
+      .co-note {
+        width: 100%; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px;
+        padding: 10px; font-size: 13px; font-family: inherit; min-height: 60px; resize: vertical;
+      }
+      .co-bar {
+        position: fixed; bottom: 0; left: 0; right: 0; background: var(--forest);
+        color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,0.2); z-index: 50;
+      }
+      .co-bar-total { font-size: 18px; font-weight: 700; }
+      .co-bar .gw-checkout { margin-top: 0; width: auto; padding: 10px 18px; }
+      .co-confirm { text-align: center; padding: 50px 20px; }
+      .co-error { position: fixed; bottom: 70px; left: 16px; right: 16px; background: #a5493a; color: #fff; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; }
+    `}</style>
+  );
+}
+
+// =====================================================================
+// STAFF APP (default view: index.html with no query params)
+// =====================================================================
+function GreenWoodApp() {
+  const [tables, setTables] = useState(buildDefaultTables);
+  const [history, setHistory] = useState([]);
+  const [currency, setCurrency] = useState("$");
+  const [menu, setMenu] = useState(DEFAULT_MENU);
+  const [loaded, setLoaded] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showMenuEditor, setShowMenuEditor] = useState(false);
+  const [showOrders, setShowOrders] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [incomingOrders, setIncomingOrders] = useState([]);
+  const [newItemDraft, setNewItemDraft] = useState({});
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [customPrice, setCustomPrice] = useState("");
+  const [toast, setToast] = useState(null);
+  const [confirmClearToday, setConfirmClearToday] = useState(false);
+  const saveTimer = useRef(null);
+  const toastTimer = useRef(null);
+  const clearConfirmTimer = useRef(null);
+  const audioCtxRef = useRef(null);
+  const prevOrderCountRef = useRef(0);
+
+  // ---- load persisted data once (browser localStorage) ----
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem("gw-tables");
+      const h = localStorage.getItem("gw-history");
+      const c = localStorage.getItem("gw-currency");
+      const m = localStorage.getItem("gw-menu");
+      if (t) {
+        const loadedTables = JSON.parse(t);
+        const merged = buildDefaultTables();
+        Object.keys(merged).forEach((id) => {
+          if (loadedTables[id]) merged[id] = loadedTables[id];
+        });
+        setTables(merged);
+      }
+      if (h) setHistory(JSON.parse(h));
+      if (c) setCurrency(c);
+      if (m) setMenu(JSON.parse(m));
+    } catch (e) {}
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem("gw-tables", JSON.stringify(tables));
+        localStorage.setItem("gw-history", JSON.stringify(history));
+        localStorage.setItem("gw-currency", currency);
+        localStorage.setItem("gw-menu", JSON.stringify(menu));
+      } catch (e) {}
+    }, 250);
+    return () => clearTimeout(saveTimer.current);
+  }, [tables, history, currency, menu, loaded]);
+
+  // ---- realtime listener for incoming customer orders ----
+  useEffect(() => {
+    const unsub = db.collection("orders").where("status", "==", "pending").onSnapshot(
+      (snap) => {
+        const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        orders.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+        if (orders.length > prevOrderCountRef.current) {
+          playBeep(audioCtxRef);
+        }
+        prevOrderCountRef.current = orders.length;
+        setIncomingOrders(orders);
+      },
+      (err) => {}
+    );
+    // resume audio context on first user tap (mobile autoplay policies)
+    const resume = () => {
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+    };
+    document.addEventListener("click", resume);
+    return () => {
+      unsub();
+      document.removeEventListener("click", resume);
+    };
+  }, []);
+
+  const isVip = (tableId) => isVipTable(tableId);
+
+  const occupiedCount = useMemo(
+    () => Object.values(tables).filter((t) => t.status === "occupied").length,
+    [tables]
+  );
+  const totalTables = useMemo(() => Object.keys(tables).length, [tables]);
+
+  const todayRevenue = useMemo(() => {
+    const today = new Date().toDateString();
+    return history.filter((h) => new Date(h.closedAt).toDateString() === today).reduce((sum, h) => sum + h.total, 0);
+  }, [history]);
+
+  const todayTips = useMemo(() => {
+    const today = new Date().toDateString();
+    return history.filter((h) => new Date(h.closedAt).toDateString() === today).reduce((sum, h) => sum + (h.tip || 0), 0);
+  }, [history]);
+
+  const todayCigarettes = useMemo(() => {
+    const today = new Date().toDateString();
+    return history.filter((h) => new Date(h.closedAt).toDateString() === today).reduce((sum, h) => sum + (h.cigarettes || 0), 0);
+  }, [history]);
+
+  function openSelected(tableId) {
+    setSelected(tableId);
+    setCustomName("");
+    setCustomPrice("");
+  }
+
+  function seatTable(tableId, guests) {
+    setTables((prev) => ({
+      ...prev,
+      [tableId]: { status: "occupied", items: [], openedAt: Date.now(), guests, tip: 0, cigarettes: 0 },
+    }));
+  }
+
+  function setTip(tableId, value) {
+    const tip = Math.max(0, parseFloat(value) || 0);
+    setTables((prev) => ({ ...prev, [tableId]: { ...prev[tableId], tip } }));
+  }
+
+  function setCigarettes(tableId, value) {
+    const cigarettes = Math.max(0, parseFloat(value) || 0);
+    setTables((prev) => ({ ...prev, [tableId]: { ...prev[tableId], cigarettes } }));
+  }
+
+  function changeCigarettes(tableId, delta) {
+    const t = tables[tableId];
+    const cigarettes = Math.max(0, (t.cigarettes || 0) + delta * 2.5);
+    setTables((prev) => ({ ...prev, [tableId]: { ...t, cigarettes } }));
+  }
+
+  function addItem(tableId, name, price, vipExtra = 0, qty = 1) {
+    if (!name || !(price >= 0)) return;
+    setTables((prev) => {
+      const t = prev[tableId];
+      if (name === "سجائر") {
+        return { ...prev, [tableId]: { ...t, cigarettes: (t.cigarettes || 0) + price * qty } };
+      }
+      const items = [...t.items];
+      const idx = items.findIndex((it) => it.name === name && it.price === price);
+      if (idx >= 0) {
+        items[idx] = { ...items[idx], qty: items[idx].qty + qty };
+      } else {
+        items.push({ id: uid(), name, price, qty, vipExtra });
+      }
+      return { ...prev, [tableId]: { ...t, items } };
+    });
+  }
+
+  function changeQty(tableId, itemId, delta) {
+    setTables((prev) => {
+      const t = prev[tableId];
+      let items = t.items
+        .map((it) => (it.id === itemId ? { ...it, qty: it.qty + delta } : it))
+        .filter((it) => it.qty > 0);
+      return { ...prev, [tableId]: { ...t, items } };
+    });
+  }
+
+  function removeItem(tableId, itemId) {
+    setTables((prev) => {
+      const t = prev[tableId];
+      return { ...prev, [tableId]: { ...t, items: t.items.filter((it) => it.id !== itemId) } };
+    });
+  }
+
+  function tableTotal(tableId) {
+    const t = tables[tableId];
+    if (!t) return 0;
+    return t.items.reduce((s, it) => s + it.price * it.qty, 0);
+  }
+
+  function checkoutTable(tableId) {
+    const t = tables[tableId];
+    const total = tableTotal(tableId);
+    const s = sectionOf(tableId);
+    const historyId = uid();
+
+    setHistory((prev) => [
+      {
+        id: historyId,
+        tableId,
+        label: labelOf(tableId),
+        section: s ? s.title : "",
+        items: t.items,
+        total,
+        tip: t.tip || 0,
+        cigarettes: t.cigarettes || 0,
+        openedAt: t.openedAt,
+        closedAt: Date.now(),
+      },
+      ...prev,
+    ]);
+    setTables((prev) => ({ ...prev, [tableId]: emptyTable() }));
+    setSelected(null);
+
+    clearTimeout(toastTimer.current);
+    setToast({ tableId, snapshot: t, historyId, label: labelOf(tableId) });
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
+  }
+
+  function undoCheckout() {
+    if (!toast) return;
+    setTables((prev) => ({ ...prev, [toast.tableId]: toast.snapshot }));
+    setHistory((prev) => prev.filter((h) => h.id !== toast.historyId));
+    clearTimeout(toastTimer.current);
+    setToast(null);
+  }
+
+  function updateMenuItem(category, idx, field, value) {
+    setMenu((prev) => {
+      const items = [...prev[category]];
+      const numeric = field === "price" || field === "vipExtra";
+      items[idx] = { ...items[idx], [field]: numeric ? (parseFloat(value) || 0) : value };
+      return { ...prev, [category]: items };
+    });
+  }
+
+  function deleteMenuItem(category, idx) {
+    setMenu((prev) => ({ ...prev, [category]: prev[category].filter((_, i) => i !== idx) }));
+  }
+
+  function addMenuItem(category, name) {
+    if (!name.trim()) return;
+    setMenu((prev) => ({ ...prev, [category]: [...prev[category], { name: name.trim(), price: 0, vipExtra: 0 }] }));
+  }
+
+  function addMenuCategory(name) {
+    if (!name.trim() || menu[name.trim()]) return;
+    setMenu((prev) => ({ ...prev, [name.trim()]: [] }));
+  }
+
+  function clearTodayData() {
+    const today = new Date().toDateString();
+    setHistory((prev) => prev.filter((h) => new Date(h.closedAt).toDateString() !== today));
+    clearTimeout(clearConfirmTimer.current);
+    setConfirmClearToday(false);
+  }
+
+  function handleClearTodayClick() {
+    if (!confirmClearToday) {
+      setConfirmClearToday(true);
+      clearTimeout(clearConfirmTimer.current);
+      clearConfirmTimer.current = setTimeout(() => setConfirmClearToday(false), 4000);
+      return;
+    }
+    clearTodayData();
+  }
+
+  // ---- incoming customer orders ----
+  async function acceptOrder(order) {
+    setTables((prev) => {
+      const existing = prev[order.tableId] || emptyTable();
+      const wasEmpty = existing.status !== "occupied";
+      let items = [...existing.items];
+      order.items.forEach((oi) => {
+        if (oi.name === "سجائر") return; // handled below
+        const idx = items.findIndex((it) => it.name === oi.name && it.price === oi.price);
+        if (idx >= 0) items[idx] = { ...items[idx], qty: items[idx].qty + oi.qty };
+        else items.push({ id: uid(), name: oi.name, price: oi.price, qty: oi.qty, vipExtra: oi.vipExtra || 0 });
+      });
+      const cigAdd = order.items.filter((oi) => oi.name === "سجائر").reduce((s, oi) => s + oi.price * oi.qty, 0);
+      return {
+        ...prev,
+        [order.tableId]: {
+          status: "occupied",
+          items,
+          openedAt: wasEmpty ? Date.now() : existing.openedAt,
+          guests: existing.guests,
+          tip: existing.tip || 0,
+          cigarettes: (existing.cigarettes || 0) + cigAdd,
+        },
+      };
+    });
+    try {
+      await db.collection("orders").doc(order.id).update({ status: "accepted" });
+    } catch (e) {}
+  }
+
+  async function rejectOrder(order) {
+    try {
+      await db.collection("orders").doc(order.id).update({ status: "rejected" });
+    } catch (e) {}
+  }
+
+  const sel = selected ? tables[selected] : null;
+  const selTotal = selected ? tableTotal(selected) : 0;
+  const baseUrl = window.location.origin + window.location.pathname;
+
+  return (
+    <div dir="rtl" className="gw-root">
+      <GlobalStyles />
+
+      <header className="gw-header">
+        <h1 className="gw-title">Green Wood</h1>
+        <div className="gw-sub">إدارة حجوزات وطلبات الطاولات</div>
+        <div className="gw-stats">
+          <div className="gw-stat">مشغولة<b>{occupiedCount} / {totalTables}</b></div>
+          <div className="gw-stat">إيراد اليوم<b>{todayRevenue.toFixed(2)} {currency}</b></div>
+          <div className="gw-stat">إكراميات اليوم<b>{todayTips.toFixed(2)} {currency}</b></div>
+          <div className="gw-stat">سجائر اليوم<b>{todayCigarettes.toFixed(2)} {currency}</b></div>
+          <div className="gw-stat">طلبات اليوم<b>{history.filter(h => new Date(h.closedAt).toDateString() === new Date().toDateString()).length}</b></div>
+        </div>
+        <div className="gw-toprow">
+          <input className="gw-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="العملة" />
+          <button className="gw-histbtn secondary" onClick={() => setShowQR(true)}>
+            <QrIcon size={15} /> رموز QR
+          </button>
+          <button className="gw-histbtn secondary" onClick={() => setShowMenuEditor(true)}>
+            <Settings size={15} /> قائمة الأصناف
+          </button>
+          <button className="gw-histbtn" onClick={() => setShowHistory(true)}>
+            <HistoryIcon size={15} /> سجل اليوم
+          </button>
+        </div>
+      </header>
+
+      {/* floating incoming-orders button */}
+      <button className="gw-orders-fab" onClick={() => setShowOrders(true)}>
+        <Bell size={20} />
+        {incomingOrders.length > 0 && <span className="gw-orders-badge">{incomingOrders.length}</span>}
+      </button>
+
+      {SECTIONS.map((s) => (
+        <div className="gw-section" key={s.id}>
+          <h2>{s.title}</h2>
+          <div className="gw-grid">
+            {Array.from({ length: s.count }, (_, i) => i + 1).map((n) => {
+              const id = `${s.id}-${n}`;
+              const t = tables[id] || emptyTable();
+              const occ = t.status === "occupied";
+              const pendingHere = incomingOrders.some((o) => o.tableId === id);
+              return (
+                <div key={id} className={`gw-table ${occ ? "occupied" : ""} ${pendingHere ? "has-order" : ""}`} onClick={() => openSelected(id)}>
+                  <div className="name">{s.prefix} {n}</div>
+                  <div className="state">
+                    {occ ? `مشغولة${t.guests ? ` · ${t.guests}${t.guests >= 5 ? "+" : ""} أشخاص` : ""}` : "فارغة"}
+                  </div>
+                  {occ && <div className="price">{tableTotal(id).toFixed(2)} {currency}</div>}
+                  {pendingHere && <div className="gw-order-dot">طلب جديد!</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {selected && sel && (
+        <div className="gw-overlay" onClick={() => setSelected(null)}>
+          <div className="gw-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="gw-panel-head">
+              <div>
+                <div className="gw-panel-title">{labelOf(selected)}</div>
+                <div className="gw-panel-sub">{sectionOf(selected)?.title}</div>
+              </div>
+              <button className="gw-x" onClick={() => setSelected(null)}><XIcon size={20} /></button>
+            </div>
+
+            {sel.status === "empty" ? (
+              <>
+                <div className="gw-empty-note">لا يوجد زبون حالياً على هذه الطاولة</div>
+                <div className="gw-guest-label"><DoorOpen size={15} /> كم عدد الجالسين؟</div>
+                <div className="gw-guest-pick">
+                  {[1, 2, 3, 4].map((n) => (
+                    <button key={n} onClick={() => seatTable(selected, n)}><Users size={14} /> {n}</button>
+                  ))}
+                  <button onClick={() => seatTable(selected, 5)}><Users size={14} /> 5+</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="gw-panel-sub" style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <Clock size={13} /> بدأت الجلسة: {new Date(sel.openedAt).toLocaleTimeString("ar")}
+                  </span>
+                  {sel.guests ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <Users size={13} /> {sel.guests}{sel.guests >= 5 ? "+" : ""} أشخاص
+                    </span>
+                  ) : null}
+                </div>
+
+                {isVip(selected) && <div className="gw-vip-note">طاولة VIP — يُضاف فرق السعر تلقائياً على الأصناف المشمولة</div>}
+
+                {Object.entries(menu).map(([cat, items]) => {
+                  if (items.length === 0) return null;
+                  const Icon = CATEGORY_ICON[cat];
+                  const vip = isVip(selected);
+                  return (
+                    <div key={cat} className="gw-cat">
+                      <h4>{Icon ? <Icon size={13} /> : null} {cat}</h4>
+                      <div className="gw-quick">
+                        {items.map((it, idx) => {
+                          const extra = vip ? (it.vipExtra || 0) : 0;
+                          const p = it.price + extra;
+                          return (
+                            <button key={cat + idx} onClick={() => addItem(selected, it.name, p, extra)}>
+                              {it.name} · {p}{currency}
+                              {extra > 0 && <span className="gw-vip-tag">VIP +{extra}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="gw-add-row">
+                  <input className="name" placeholder="اسم صنف آخر" value={customName} onChange={(e) => setCustomName(e.target.value)} />
+                  <input className="price" type="number" placeholder="السعر" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} />
+                  <button onClick={() => {
+                    const p = parseFloat(customPrice);
+                    if (customName.trim() && p >= 0) {
+                      addItem(selected, customName.trim(), p);
+                      setCustomName(""); setCustomPrice("");
+                    }
+                  }}><Plus size={16} /></button>
+                </div>
+
+                <div className="gw-items">
+                  {sel.items.length === 0 && <div className="gw-no-items">لم تتم إضافة أي طلبات بعد</div>}
+                  {sel.items.map((it) => (
+                    <div className="gw-item" key={it.id}>
+                      <div className="iname">
+                        {it.name}
+                        {it.vipExtra > 0 && <span className="gw-vip-tag inline">VIP +{it.vipExtra}</span>}
+                      </div>
+                      <div className="iprice">{it.price}{currency}</div>
+                      <div className="gw-qty">
+                        <button onClick={() => changeQty(selected, it.id, -1)}><Minus size={13} /></button>
+                        <span>{it.qty}</span>
+                        <button onClick={() => changeQty(selected, it.id, 1)}><Plus size={13} /></button>
+                      </div>
+                      <button className="gw-del" onClick={() => removeItem(selected, it.id)}><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ borderTop: "2px solid #ddd", marginTop: "12px", paddingTop: "12px" }}>
+                  <div style={{ fontSize: "12px", color: "#999", marginBottom: "8px", fontWeight: "500" }}>
+                    <Cigarette size={14} style={{ display: "inline", marginRight: "4px" }} /> السجائر (لحساب النادل)
+                  </div>
+                  <div className="gw-item" style={{ background: "#f9f9f9" }}>
+                    <div className="iname">سجائر</div>
+                    <div className="iprice">{(sel.cigarettes || 0).toFixed(2)}{currency}</div>
+                    <div className="gw-qty">
+                      <button onClick={() => changeCigarettes(selected, -1)}><Minus size={13} /></button>
+                      <span>{((sel.cigarettes || 0) / 2.5).toFixed(0)}</span>
+                      <button onClick={() => changeCigarettes(selected, 1)}><Plus size={13} /></button>
+                    </div>
+                    <button className="gw-del" onClick={() => setCigarettes(selected, 0)}><Trash2 size={15} /></button>
+                  </div>
+                </div>
+
+                <div className="gw-tip-row">
+                  <label>إكرامية النادل</label>
+                  <input type="number" min="0" value={sel.tip || 0} onChange={(e) => setTip(selected, e.target.value)} />
+                  <span>{currency}</span>
+                </div>
+
+                <div className="gw-total-row sub"><span>مجموع الطلبات</span><span>{selTotal.toFixed(2)} {currency}</span></div>
+                <div className="gw-total-row"><span>الإجمالي المطلوب</span><b>{(selTotal + (sel.tip || 0)).toFixed(2)} {currency}</b></div>
+
+                <button className="gw-checkout step1" onClick={() => checkoutTable(selected)}>
+                  <Receipt size={16} /> تحصيل الفاتورة وإفراغ الطاولة
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showOrders && (
+        <div className="gw-hist-overlay" onClick={() => setShowOrders(false)}>
+          <div className="gw-hist-box" onClick={(e) => e.stopPropagation()}>
+            <div className="gw-panel-head">
+              <div className="gw-panel-title">الطلبات الواردة من الزبائن</div>
+              <button className="gw-x" onClick={() => setShowOrders(false)}><XIcon size={20} /></button>
+            </div>
+            {incomingOrders.length === 0 && <div className="gw-hist-empty">لا توجد طلبات جديدة الآن</div>}
+            {incomingOrders.map((o) => (
+              <div key={o.id} className="gw-order-card">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <b>{o.tableLabel}</b>
+                  <span style={{ fontSize: 11, color: "var(--ink-soft)" }}>{o.sectionTitle}</span>
+                </div>
+                <div className="gw-hist-items" style={{ marginTop: 8 }}>
+                  {o.items.map((it, i) => (
+                    <div key={i} className="gw-hist-item">
+                      <span>{it.name} × {it.qty}</span>
+                      <span>{(it.price * it.qty).toFixed(2)} {currency}</span>
+                    </div>
+                  ))}
+                </div>
+                {o.note && <div className="gw-order-note">📝 {o.note}</div>}
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button className="gw-checkout step1" style={{ marginTop: 0, flex: 1 }} onClick={() => acceptOrder(o)}>
+                    <Check size={14} /> قبول وإضافة للفاتورة
+                  </button>
+                  <button className="gw-del" style={{ border: "1px solid #a5493a", borderRadius: 8, padding: "8px 12px" }} onClick={() => rejectOrder(o)}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showQR && (
+        <div className="gw-hist-overlay" onClick={() => setShowQR(false)}>
+          <div className="gw-hist-box" onClick={(e) => e.stopPropagation()}>
+            <div className="gw-panel-head">
+              <div>
+                <div className="gw-panel-title">رموز QR للطاولات</div>
+                <div className="gw-panel-sub">اطبع كل رمز وضعه على طاولته — الزبون يمسحه ليطلب مباشرة</div>
+              </div>
+              <button className="gw-x" onClick={() => setShowQR(false)}><XIcon size={20} /></button>
+            </div>
+            <button className="gw-histbtn" style={{ width: "100%", justifyContent: "center", marginBottom: 14 }} onClick={() => window.print()}>
+              🖨️ طباعة كل الرموز
+            </button>
+            <div id="qr-print-area" className="gw-qr-grid">
+              {SECTIONS.map((s) =>
+                Array.from({ length: s.count }, (_, i) => i + 1).map((n) => {
+                  const id = `${s.id}-${n}`;
+                  const url = `${baseUrl}?table=${id}`;
+                  return (
+                    <div className="gw-qr-card" key={id}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`}
+                        alt={labelOf(id)}
+                        width="140"
+                        height="140"
+                      />
+                      <div className="gw-qr-label">{s.prefix} {n}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHistory && (
+        <div className="gw-hist-overlay" onClick={() => { setShowHistory(false); setConfirmClearToday(false); }}>
+          <div className="gw-hist-box" onClick={(e) => e.stopPropagation()}>
+            <div className="gw-panel-head">
+              <div className="gw-panel-title">سجل الطاولات المغلقة</div>
+              <button className="gw-x" onClick={() => { setShowHistory(false); setConfirmClearToday(false); }}><XIcon size={20} /></button>
+            </div>
+            <button className={`gw-clear-today ${confirmClearToday ? "confirm" : ""}`} onClick={handleClearTodayClick}>
+              <Trash2 size={14} /> {confirmClearToday ? "اضغط مرة أخرى للتأكيد" : "مسح بيانات اليوم"}
+            </button>
+            {history.length === 0 && <div className="gw-hist-empty">لا توجد فواتير محفوظة بعد</div>}
+            {history.map((h) => (
+              <div className="gw-hist-row" key={h.id}>
+                <div style={{ flex: 1 }}>
+                  <div className="l">{h.label}</div>
+                  <div className="loc">{h.section}</div>
+                  <div className="t">
+                    {new Date(h.closedAt).toLocaleDateString("ar")} — {new Date(h.closedAt).toLocaleTimeString("ar")} · {h.items.length} صنف
+                    {h.tip ? ` · إكرامية ${h.tip.toFixed(2)}${currency}` : ""}
+                    {h.cigarettes ? ` · سجائر ${h.cigarettes.toFixed(2)}${currency}` : ""}
+                  </div>
+                  {h.items.length > 0 && (
+                    <div className="gw-hist-items">
+                      {h.items.map((it) => (
+                        <div key={it.id} className="gw-hist-item">
+                          <span>{it.name} × {it.qty}</span>
+                          <span>{(it.price * it.qty).toFixed(2)}{currency}{it.vipExtra > 0 && <span className="gw-vip-tag inline">VIP +{it.vipExtra}</span>}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="p">{(h.total + (h.tip || 0)).toFixed(2)} {currency}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showMenuEditor && (
+        <div className="gw-hist-overlay" onClick={() => setShowMenuEditor(false)}>
+          <div className="gw-hist-box" onClick={(e) => e.stopPropagation()}>
+            <div className="gw-panel-head">
+              <div>
+                <div className="gw-panel-title">قائمة الأصناف</div>
+                <div className="gw-panel-sub">عدّل الأسماء والأسعار وفرق سعر VIP لأي صنف</div>
+              </div>
+              <button className="gw-x" onClick={() => setShowMenuEditor(false)}><XIcon size={20} /></button>
+            </div>
+            {Object.entries(menu).map(([cat, items]) => (
+              <div className="gw-menu-cat" key={cat}>
+                <h4>{cat}</h4>
+                <div className="gw-menu-item-head"><span>الصنف</span><span>السعر</span><span>فرق VIP</span><span></span></div>
+                {items.map((it, idx) => (
+                  <div className="gw-menu-item-row" key={cat + idx}>
+                    <input value={it.name} onChange={(e) => updateMenuItem(cat, idx, "name", e.target.value)} />
+                    <input type="number" value={it.price} onChange={(e) => updateMenuItem(cat, idx, "price", e.target.value)} />
+                    <input type="number" value={it.vipExtra || 0} onChange={(e) => updateMenuItem(cat, idx, "vipExtra", e.target.value)} />
+                    <button className="gw-del" onClick={() => deleteMenuItem(cat, idx)}><Trash2 size={15} /></button>
+                  </div>
+                ))}
+                <div className="gw-add-row menu">
+                  <input className="name" placeholder="إضافة صنف جديد" value={newItemDraft[cat] || ""} onChange={(e) => setNewItemDraft((p) => ({ ...p, [cat]: e.target.value }))} />
+                  <button onClick={() => { addMenuItem(cat, newItemDraft[cat] || ""); setNewItemDraft((p) => ({ ...p, [cat]: "" })); }}><Plus size={16} /></button>
+                </div>
+              </div>
+            ))}
+            <div className="gw-menu-cat">
+              <h4>فئة جديدة</h4>
+              <div className="gw-add-row menu">
+                <input className="name" placeholder="اسم الفئة (مثال: حلويات)" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
+                <button onClick={() => { addMenuCategory(newCategoryName); setNewCategoryName(""); }}><Plus size={16} /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="gw-toast">
+          <span>تم إفراغ {toast.label} وحفظ الفاتورة</span>
+          <button onClick={undoCheckout}><Undo2 size={14} /> تراجع</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GlobalStyles() {
+  return (
+    <style>{`
+      .gw-root {
+        --forest: #34432f; --forest-deep: #232f20; --paper: #f3eee1; --card: #fbf8f1;
+        --ink: #2a2620; --ink-soft: #6b6355; --wood: #8a5f3c; --amber: #c1893d;
+        --amber-soft: #f1ddb6; --sage: #cdd9bf; --sage-line: #8ba377; --line: #ded4bd;
+        font-family: -apple-system, "Segoe UI", Tahoma, "Geeza Pro", sans-serif;
+        background: var(--paper); color: var(--ink); min-height: 100vh;
+        padding: 18px 14px 60px; box-sizing: border-box; position: relative;
+      }
+      .gw-root * { box-sizing: border-box; }
+      .gw-header { background: var(--forest); color: var(--paper); border-radius: 16px; padding: 18px 20px; margin-bottom: 18px; }
+      .gw-title { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: 0.2px; }
+      .gw-sub { font-size: 13px; color: #cfd8c4; margin-top: 2px; }
+      .gw-stats { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+      .gw-stat { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; font-size: 13px; min-width: 90px; }
+      .gw-stat b { display: block; font-size: 17px; font-weight: 700; }
+      .gw-toprow { display:flex; gap:8px; align-items:center; margin-top:14px; flex-wrap: wrap; }
+      .gw-currency { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: var(--paper); border-radius: 8px; padding: 6px 8px; width: 64px; font-size: 13px; }
+      .gw-currency::placeholder { color: #cfd8c4; }
+      .gw-histbtn { margin-right: auto; background: var(--amber); color: #2a2010; border: none; border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+      .gw-histbtn.secondary { background: rgba(255,255,255,0.12); color: var(--paper); margin-right: 0; }
+      .gw-section { margin-bottom: 20px; }
+      .gw-section h2 { font-size: 15px; font-weight: 700; color: var(--wood); margin: 0 0 8px 2px; }
+      .gw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+      .gw-table { border-radius: 12px; border: 1.5px solid var(--sage-line); background: var(--sage); padding: 10px 6px; text-align: center; cursor: pointer; transition: transform 0.12s ease; position: relative; }
+      .gw-table:active { transform: scale(0.96); }
+      .gw-table.occupied { background: var(--amber-soft); border-color: var(--amber); }
+      .gw-table.has-order { border-color: #a5493a; box-shadow: 0 0 0 2px #a5493a55; }
+      .gw-table .name { font-size: 13px; font-weight: 700; color: var(--ink); }
+      .gw-table .state { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+      .gw-table .price { font-size: 12px; font-weight: 700; color: var(--wood); margin-top: 3px; }
+      .gw-order-dot { font-size: 9px; font-weight: 700; color: #a5493a; margin-top: 2px; }
+      .gw-overlay { position: fixed; inset: 0; background: rgba(35,47,32,0.45); display: flex; justify-content: flex-end; z-index: 40; }
+      .gw-panel { background: var(--card); width: 380px; max-width: 100%; height: 100%; padding: 18px 16px; overflow-y: auto; box-shadow: -8px 0 24px rgba(0,0,0,0.15); }
+      .gw-panel-head { display:flex; justify-content: space-between; align-items:flex-start; margin-bottom: 4px; }
+      .gw-panel-title { font-size: 19px; font-weight: 700; }
+      .gw-panel-sub { font-size: 12px; color: var(--ink-soft); margin-top:2px; }
+      .gw-x { background: none; border: none; cursor: pointer; color: var(--ink-soft); padding: 4px; }
+      .gw-empty-note { margin-top: 30px; text-align: center; color: var(--ink-soft); font-size: 13px; }
+      .gw-guest-label { display: flex; align-items: center; gap: 6px; justify-content: center; margin-top: 18px; font-size: 13px; color: var(--ink-soft); }
+      .gw-guest-pick { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+      .gw-guest-pick button { background: var(--forest); color: var(--paper); border: none; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+      .gw-toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--forest-deep); color: var(--paper); border-radius: 10px; padding: 10px 14px; font-size: 13px; display: flex; align-items: center; gap: 14px; z-index: 60; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+      .gw-toast button { background: var(--amber); color: #2a2010; border: none; border-radius: 8px; padding: 6px 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+      .gw-vip-note { background: var(--amber-soft); color: #6b4a17; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin: 12px 0 2px; text-align: center; }
+      .gw-cat h4 { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--wood); margin: 14px 0 6px; }
+      .gw-tip-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+      .gw-tip-row label { font-size: 13px; color: var(--ink-soft); flex: 1; }
+      .gw-tip-row input { width: 80px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; font-size: 13px; background: #fff; text-align: center; }
+      .gw-tip-row span { font-size: 12px; color: var(--ink-soft); }
+      .gw-total-row.sub { margin-top: 10px; padding-top: 0; border-top: none; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
+      .gw-menu-cat { margin-bottom: 20px; }
+      .gw-menu-cat h4 { font-size: 14px; font-weight: 700; color: var(--wood); margin-bottom: 6px; }
+      .gw-menu-item-head { display: grid; grid-template-columns: 2fr 1fr 1fr 28px; gap: 6px; font-size: 11px; color: var(--ink-soft); padding: 0 2px 4px; }
+      .gw-menu-item-row { display: grid; grid-template-columns: 2fr 1fr 1fr 28px; gap: 6px; margin-bottom: 6px; align-items: center; }
+      .gw-menu-item-row input { border: 1px solid var(--line); border-radius: 7px; padding: 6px 7px; font-size: 12.5px; background: #fff; width: 100%; }
+      .gw-add-row.menu { margin-top: 4px; margin-bottom: 4px; }
+      .gw-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+      .gw-quick button { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink); }
+      .gw-quick button:active { background: var(--sage); }
+      .gw-vip-tag { display: inline-block; margin-right: 5px; background: var(--amber); color: #2a2010; border-radius: 5px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+      .gw-vip-tag.inline { margin-right: 0; margin-left: 6px; }
+      .gw-add-row { display: flex; gap: 6px; margin-bottom: 14px; }
+      .gw-add-row input { border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 13px; background: #fff; }
+      .gw-add-row input.name { flex: 2; }
+      .gw-add-row input.price { flex: 1; }
+      .gw-add-row button { background: var(--wood); color: #fff; border: none; border-radius: 8px; padding: 0 12px; cursor: pointer; display:flex; align-items:center; justify-content:center; }
+      .gw-items { border-top: 1px solid var(--line); }
+      .gw-item { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+      .gw-item .iname { flex: 1; font-size: 13.5px; font-weight: 600; }
+      .gw-item .iprice { font-size: 12px; color: var(--ink-soft); }
+      .gw-qty { display: flex; align-items: center; gap: 6px; }
+      .gw-qty button { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; display:flex; align-items:center; justify-content:center; }
+      .gw-qty span { min-width: 16px; text-align: center; font-size: 13px; font-weight: 700; }
+      .gw-del { background: none; border: none; color: #a5493a; cursor: pointer; padding: 4px; }
+      .gw-no-items { color: var(--ink-soft); font-size: 13px; padding: 16px 0; text-align: center; }
+      .gw-total-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--ink); font-size: 15px; font-weight: 700; }
+      .gw-total-row b { font-size: 20px; color: var(--wood); }
+      .gw-checkout { margin-top: 16px; width: 100%; border: none; border-radius: 10px; padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+      .gw-checkout.step1 { background: var(--amber); color: #2a2010; }
+      .gw-hist-overlay { position: fixed; inset: 0; background: rgba(35,47,32,0.45); z-index: 40; display:flex; justify-content:center; align-items:flex-start; padding: 30px 12px; }
+      .gw-hist-box { background: var(--card); border-radius: 16px; padding: 18px; width: 460px; max-width: 100%; max-height: 85vh; overflow-y:auto; }
+      .gw-hist-row { border-bottom: 1px solid var(--line); padding: 10px 0; display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; }
+      .gw-hist-row .l { font-size: 13.5px; font-weight: 700; }
+      .gw-hist-row .loc { font-size: 11px; color: var(--wood); margin-top: 1px; }
+      .gw-hist-row .t { font-size: 11.5px; color: var(--ink-soft); }
+      .gw-hist-row .p { font-size: 14px; font-weight: 700; color: var(--wood); white-space: nowrap; }
+      .gw-hist-items { margin-top: 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
+      .gw-hist-item { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--ink); padding: 2px 0; }
+      .gw-hist-empty { text-align:center; color: var(--ink-soft); font-size: 13px; padding: 30px 0; }
+      .gw-clear-today { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 4px 0 14px; background: none; border: 1px solid #a5493a; color: #a5493a; border-radius: 8px; padding: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+      .gw-clear-today.confirm { background: #a5493a; color: #fff; }
+      .gw-orders-fab { position: fixed; bottom: 20px; left: 20px; width: 54px; height: 54px; border-radius: 50%; background: var(--forest); color: #fff; border: none; box-shadow: 0 6px 16px rgba(0,0,0,0.3); z-index: 45; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+      .gw-orders-badge { position: absolute; top: -4px; right: -4px; background: #a5493a; color: #fff; font-size: 11px; font-weight: 700; border-radius: 50%; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+      .gw-order-card { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+      .gw-order-note { background: var(--amber-soft); border-radius: 8px; padding: 6px 8px; font-size: 12px; margin-top: 8px; }
+      .gw-qr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .gw-qr-card { border: 1px dashed var(--line); border-radius: 10px; padding: 10px; text-align: center; }
+      .gw-qr-card img { max-width: 100%; height: auto; }
+      .gw-qr-label { margin-top: 6px; font-weight: 700; font-size: 13px; }
+      @media (max-width: 480px) {
+        .gw-panel { width: 100%; }
+        .gw-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+      }
+    `}</style>
+  );
+}
+
+// ---------- entry point: decide staff view vs customer view ----------
+const params = new URLSearchParams(window.location.search);
+const tableParam = params.get("table");
+const root = ReactDOM.createRoot(document.getElementById("root"));
+if (tableParam) {
+  root.render(<CustomerOrderApp tableId={tableParam} />);
+} else {
+  root.render(<GreenWoodApp />);
+}
+
+</script>
+</body>
+</html>
