@@ -275,10 +275,12 @@ function CustomerOrderApp({ tableId }) {
   return (
     <div dir="rtl" className="gw-root co-root">
       <CustomerStyles />
-      <header className="gw-header">
-        <h1 className="gw-title">Green Wood</h1>
-        <div className="gw-sub">أهلاً بك، أنت الآن على {labelOf(tableId)}</div>
-        {vip && <div className="gw-vip-note" style={{ marginTop: 10 }}>طاولة VIP — الأسعار المعروضة نهائية</div>}
+      <header className="co-header">
+        <div className="co-logo-badge">🌿</div>
+        <h1 className="co-brand">GREEN WOOD</h1>
+        <div className="co-brand-tag">COFFEE &amp; MORE</div>
+        <div className="co-table-pill">📍 {labelOf(tableId)}</div>
+        {vip && <div className="co-vip-pill">✨ طاولة VIP — الأسعار المعروضة نهائية</div>}
       </header>
 
       {submitted ? (
@@ -295,16 +297,33 @@ function CustomerOrderApp({ tableId }) {
           {Object.entries(DEFAULT_MENU).map(([cat, items]) => {
             const Icon = CATEGORY_ICON[cat];
             return (
-              <div key={cat} className="gw-cat">
-                <h4>{Icon ? <Icon size={13} /> : null} {cat}</h4>
-                <div className="gw-quick">
+              <div key={cat} className="co-section">
+                <div className="co-section-head">
+                  <span className="co-section-icon">{Icon ? <Icon size={14} /> : "•"}</span>
+                  <span className="co-section-title">{cat}</span>
+                  <span className="co-section-line"></span>
+                </div>
+                <div className="co-item-list">
                   {items.map((it, idx) => {
                     const extra = vip ? it.vipExtra || 0 : 0;
                     const p = it.price + extra;
+                    const inCart = cart.find((c) => c.name === it.name && c.price === p);
                     return (
-                      <button key={cat + idx} onClick={() => addToCart(it.name, p, extra)}>
-                        {it.name} · {p} د.م
-                      </button>
+                      <div className={`co-item-row ${inCart ? "active" : ""}`} key={cat + idx}>
+                        <div className="co-item-name">{it.name}</div>
+                        <div className="co-item-price">{p} د.م</div>
+                        {inCart ? (
+                          <div className="co-item-stepper">
+                            <button onClick={() => changeQty(inCart.id, -1)}><Minus size={13} /></button>
+                            <span>{inCart.qty}</span>
+                            <button onClick={() => changeQty(inCart.id, 1)}><Plus size={13} /></button>
+                          </div>
+                        ) : (
+                          <button className="co-add-btn" onClick={() => addToCart(it.name, p, extra)}>
+                            <Plus size={15} />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -313,7 +332,7 @@ function CustomerOrderApp({ tableId }) {
           })}
 
           <div className="co-cart-area">
-            <h4 style={{ color: "var(--wood)" }}>سلتك</h4>
+            <h4 style={{ color: "var(--wood)", margin: "0 0 10px" }}>🧾 ملخص طلبك</h4>
             {cart.length === 0 && <div className="gw-no-items">لم تختر أي صنف بعد</div>}
             {cart.map((it) => (
               <div className="gw-item" key={it.id}>
@@ -353,6 +372,35 @@ function CustomerStyles() {
   return (
     <style>{`
       .co-root { padding-bottom: 110px; }
+      .co-header {
+        background: linear-gradient(160deg, var(--forest), var(--forest-deep));
+        color: #fff; border-radius: 20px; padding: 28px 16px 22px; text-align: center;
+        margin-bottom: 20px; box-shadow: 0 6px 20px rgba(35,47,32,0.25);
+      }
+      .co-logo-badge {
+        width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,0.1);
+        border: 2px solid var(--amber); display: flex; align-items: center; justify-content: center;
+        font-size: 26px; margin: 0 auto 12px;
+      }
+      .co-brand { font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 700; letter-spacing: 2px; margin: 0; }
+      .co-brand-tag { font-size: 10px; letter-spacing: 4px; color: var(--amber-soft); margin-top: 5px; }
+      .co-table-pill { display: inline-block; margin-top: 16px; background: var(--amber); color: #2a2010; font-weight: 700; font-size: 13px; padding: 6px 18px; border-radius: 20px; }
+      .co-vip-pill { margin-top: 10px; font-size: 11px; color: var(--amber-soft); }
+      .co-section { margin-bottom: 22px; }
+      .co-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0 2px; }
+      .co-section-icon { font-size: 14px; }
+      .co-section-title { font-size: 14px; font-weight: 800; color: var(--wood); white-space: nowrap; }
+      .co-section-line { flex: 1; height: 1px; background: var(--line); }
+      .co-item-list { background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+      .co-item-row { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
+      .co-item-row:last-child { border-bottom: none; }
+      .co-item-row.active { background: var(--amber-soft); }
+      .co-item-name { flex: 1; font-size: 14px; font-weight: 600; }
+      .co-item-price { font-size: 12.5px; color: var(--wood); font-weight: 700; white-space: nowrap; }
+      .co-add-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--forest); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+      .co-item-stepper { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 4px 8px; flex-shrink: 0; }
+      .co-item-stepper button { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+      .co-item-stepper span { min-width: 16px; text-align: center; font-weight: 700; font-size: 13px; }
       .co-cart-area { background: var(--card); border-radius: 14px; padding: 14px; margin-top: 10px; }
       .co-note {
         width: 100%; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px;
@@ -911,13 +959,26 @@ function GreenWoodApp() {
                   const url = `${baseUrl}?table=${id}`;
                   return (
                     <div className="gw-qr-card" key={id}>
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`}
-                        alt={labelOf(id)}
-                        width="140"
-                        height="140"
-                      />
-                      <div className="gw-qr-label">{s.prefix} {n}</div>
+                      <div className="qrc-header">
+                        <div className="qrc-leaf">🌿</div>
+                        <div className="qrc-brand">GREEN WOOD</div>
+                        <div className="qrc-tag">COFFEE &amp; MORE</div>
+                      </div>
+                      <div className="qrc-body">
+                        <div className="qrc-instruction">امسح الرمز بكاميرا هاتفك<br />واطلب مباشرة من مكانك</div>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&color=34-43-47&data=${encodeURIComponent(url)}`}
+                          alt={labelOf(id)}
+                          width="160"
+                          height="160"
+                        />
+                        <div className="qrc-table">{s.prefix} {n}</div>
+                      </div>
+                      <div className="qrc-steps">
+                        <span>📷 امسح</span>
+                        <span>🛒 اختر طلبك</span>
+                        <span>☕ سيصلك النادل</span>
+                      </div>
                     </div>
                   );
                 })
@@ -1113,10 +1174,39 @@ function GlobalStyles() {
       .gw-orders-badge { position: absolute; top: -4px; right: -4px; background: #a5493a; color: #fff; font-size: 11px; font-weight: 700; border-radius: 50%; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
       .gw-order-card { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
       .gw-order-note { background: var(--amber-soft); border-radius: 8px; padding: 6px 8px; font-size: 12px; margin-top: 8px; }
-      .gw-qr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-      .gw-qr-card { border: 1px dashed var(--line); border-radius: 10px; padding: 10px; text-align: center; }
-      .gw-qr-card img { max-width: 100%; height: auto; }
-      .gw-qr-label { margin-top: 6px; font-weight: 700; font-size: 13px; }
+      .gw-qr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+      .gw-qr-card {
+        border-radius: 20px; overflow: hidden; background: var(--card);
+        box-shadow: 0 6px 18px rgba(35,47,32,0.18); display: flex; flex-direction: column;
+        break-inside: avoid; page-break-inside: avoid;
+      }
+      .qrc-header {
+        background: linear-gradient(135deg, var(--forest), var(--forest-deep));
+        color: #fff; text-align: center; padding: 14px 8px 12px; position: relative;
+      }
+      .qrc-header::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 10px;
+        background: var(--card);
+        border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      }
+      .qrc-leaf { font-size: 20px; line-height: 1; }
+      .qrc-brand { font-size: 17px; font-weight: 800; letter-spacing: 1.5px; margin-top: 4px; }
+      .qrc-tag { font-size: 8.5px; letter-spacing: 2.5px; color: var(--amber-soft); margin-top: 3px; }
+      .qrc-body { padding: 16px 12px 10px; text-align: center; }
+      .qrc-instruction { font-size: 12px; font-weight: 700; color: var(--wood); line-height: 1.5; margin-bottom: 12px; }
+      .qrc-body img { max-width: 100%; height: auto; border: 6px solid #fff; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+      .qrc-table {
+        display: inline-block; margin-top: 12px; background: var(--amber); color: #2a2010;
+        font-size: 15px; font-weight: 800; padding: 5px 20px; border-radius: 20px;
+      }
+      .qrc-steps {
+        background: var(--amber-soft); color: #6b4a17; display: flex; justify-content: space-around;
+        padding: 9px 4px; font-size: 9.5px; font-weight: 700;
+      }
+      @media print {
+        .gw-qr-grid { grid-template-columns: repeat(2, 1fr); gap: 10mm; }
+        .gw-qr-card { box-shadow: none; border: 1px solid #ccc; }
+      }
       @media (max-width: 480px) {
         .gw-panel { width: 100%; }
         .gw-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
